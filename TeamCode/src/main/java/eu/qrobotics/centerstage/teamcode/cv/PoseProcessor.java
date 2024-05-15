@@ -30,6 +30,8 @@ public class PoseProcessor implements VisionProcessor {
     public double width=0;
     public double height=0;
 
+
+
     public Boolean hasData=false;
 
     private PoseDetectorOptions options;

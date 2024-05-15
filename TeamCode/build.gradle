@@ -21,9 +21,15 @@ android {
     packagingOptions {
         jniLibs.useLegacyPackaging true
     }
+
+    aaptOptions {
+        noCompress "tflite"
+    }
 }
 
 dependencies {
     implementation project(':FtcRobotController')
     annotationProcessor files('lib/OpModeAnnotationProcessor.jar')
+
+    implementation 'org.tensorflow:tensorflow-lite:2.12.0'
 }

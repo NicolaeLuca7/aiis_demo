@@ -17,6 +17,8 @@ import org.firstinspires.ftc.vision.VisionPortal;
 import java.util.Timer;
 
 import eu.qrobotics.centerstage.teamcode.cv.PoseProcessor;
+import eu.qrobotics.centerstage.teamcode.subsystems.Elevator;
+import eu.qrobotics.centerstage.teamcode.subsystems.Outtake;
 import eu.qrobotics.centerstage.teamcode.subsystems.Robot;
 import eu.qrobotics.centerstage.teamcode.util.MecanumUtil;
 
@@ -35,6 +37,8 @@ public class TrackingOpMode extends LinearOpMode {
 
     public ElapsedTime timer;
 
+
+
     @Override
     public void runOpMode() throws InterruptedException {
 
@@ -44,9 +48,12 @@ public class TrackingOpMode extends LinearOpMode {
         turnPID=new PIDFController(turnCoeff);
 
         poseProcessor=new PoseProcessor();
+
         robot=new Robot(this, false);
 
         robot.start();
+
+
 
         VisionPortal visionPortal = new VisionPortal.Builder()
                 .setCamera(hardwareMap.get(WebcamName.class, "Webcam 1"))
@@ -70,6 +77,8 @@ public class TrackingOpMode extends LinearOpMode {
             telemetry.update();
         }
 
+
+
         timer=new ElapsedTime();
 
         while (!isStarted()&&!isStopRequested()){
@@ -89,10 +98,16 @@ public class TrackingOpMode extends LinearOpMode {
 
             if(poseProcessor.hasData) {
                 try {
+
+
+
+
+
                     telemetry.addData("Center X", poseProcessor.getCenterPose().getX());
                     telemetry.addData("Center Y", poseProcessor.getCenterPose().getY());
                     telemetry.addData("Vertical distance",poseProcessor.getVerticalDistance());
                     telemetry.addData("Vertical target",poseProcessor.verticalTarget*poseProcessor.height);
+                    telemetry.addData("Left Angle",Math.toDegrees(poseProcessor.getLeftAngle()));
                 }
                 catch (Exception e){
 
@@ -133,6 +148,28 @@ public class TrackingOpMode extends LinearOpMode {
 
             MecanumUtil.Wheels wh = MecanumUtil.motionToWheelsFullSpeed(motion).scaleWheelPower(1); // Use full forward speed on 19:1 motors
             robot.drive.setMotorPowers(wh.frontLeft, wh.backLeft, wh.backRight, wh.frontRight);
+
+            if(poseProcessor.isLeftHandUp()){
+                robot.outtake.outtakeState= Outtake.OuttakeState.SCORE;
+                robot.elevator.elevatorState= Elevator.ElevatorState.LINES;
+                robot.elevator.targetHeight= Elevator.TargetHeight.AUTO_HEIGHT0;
+                double angle= poseProcessor.getLeftAngle();
+                if(angle>Math.toRadians(30)){
+                    robot.outtake.diffyHState = Outtake.DiffyHorizontalState.RIGHT;
+                }
+                else if(angle<Math.toRadians(-10)){
+                    robot.outtake.diffyHState = Outtake.DiffyHorizontalState.LEFT;
+                }
+                else{
+                    robot.outtake.diffyHState = Outtake.DiffyHorizontalState.CENTER;
+                }
+            }
+            else{
+                robot.outtake.diffyHState = Outtake.DiffyHorizontalState.CENTER;
+                robot.outtake.outtakeState= Outtake.OuttakeState.ABOVE_TRANSFER;
+                robot.elevator.elevatorState= Elevator.ElevatorState.TRANSFER;
+            }
+
             timer.reset();
         }catch (Exception e){
         }

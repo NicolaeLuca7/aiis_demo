@@ -30,9 +30,9 @@ public class PoseProcessor implements VisionProcessor {
     public double width=0;
     public double height=0;
 
-
-
     public Boolean hasData=false;
+
+    private Mat inputMatrix;
 
     private PoseDetectorOptions options;
     private PoseDetector poseDetector;
@@ -41,7 +41,10 @@ public class PoseProcessor implements VisionProcessor {
 
     private Vector2d centerPose=null;
 
-    private boolean processing=false;
+    public boolean processing=false;
+
+    public int runs=0;
+
 
     @Override
     public void init(int width, int height, CameraCalibration calib) {
@@ -56,43 +59,56 @@ public class PoseProcessor implements VisionProcessor {
 
     @Override
     public Object processFrame (Mat input, long captureTimeNanos) {
-        Bitmap bitmap = Bitmap.createBitmap(input.cols(), input.rows(), Bitmap.Config.ARGB_8888);
-        Utils.matToBitmap(input, bitmap);
-        InputImage image = InputImage.fromBitmap(bitmap, 0);
+        inputMatrix=input;
 
-        if(!processing) {
-            processing=true;
-            poseDetector.process(image).addOnSuccessListener(
-                            pose -> {
-                                landmarks = pose.getAllPoseLandmarks();
-                                if (landmarks != null && landmarks.size() == 33) {
-                                    hasData = true;
-                                    List<Vector2d> points = new ArrayList<>();
-                                    points.add(new Vector2d(landmarks.get(12).getPosition().x, landmarks.get(12).getPosition().y));
-                                    points.add(new Vector2d(landmarks.get(11).getPosition().x, landmarks.get(12).getPosition().y));
-                                    points.add(new Vector2d(landmarks.get(23).getPosition().x, landmarks.get(12).getPosition().y));
-                                    points.add(new Vector2d(landmarks.get(24).getPosition().x, landmarks.get(12).getPosition().y));
-                                    PoseLandmark rightShoulder = pose.getPoseLandmark(PoseLandmark.RIGHT_SHOULDER);
-                                    PoseLandmark leftHip = pose.getPoseLandmark(PoseLandmark.LEFT_HIP);
-                                    centerPose = new Vector2d((rightShoulder.getPosition().x+leftHip.getPosition().x)/2,(rightShoulder.getPosition().y+leftHip.getPosition().y)/2);
-                                }
-                                else{
-                                    hasData = false;
-                                    landmarks = null;
-                                    centerPose = null;
-                                }
-                                processing = false;
-                            })
-                    .addOnFailureListener(
-                            e -> {
-                                hasData = false;
-                                landmarks = null;
-                                centerPose = null;
-                                processing=false;
-                            });
+        if(!processing){
+            if(runs==3) {
+                runs=0;
+                processing=true;
+                runProcessor();
+            }
+            else{
+                runs++;
+            }
         }
 
         return null;
+    }
+
+
+    public void runProcessor(){
+        Bitmap bitmap = Bitmap.createBitmap(inputMatrix.cols(), inputMatrix.rows(), Bitmap.Config.ARGB_8888);
+        Utils.matToBitmap(inputMatrix, bitmap);
+        InputImage image = InputImage.fromBitmap(bitmap, 0);
+        processing=true;
+        poseDetector.process(image).addOnSuccessListener(
+                        pose -> {
+                            landmarks = pose.getAllPoseLandmarks();
+                            if (landmarks != null && landmarks.size() == 33) {
+                                hasData = true;
+                                List<Vector2d> points = new ArrayList<>();
+                                points.add(new Vector2d(landmarks.get(12).getPosition().x, landmarks.get(12).getPosition().y));
+                                points.add(new Vector2d(landmarks.get(11).getPosition().x, landmarks.get(12).getPosition().y));
+                                points.add(new Vector2d(landmarks.get(23).getPosition().x, landmarks.get(12).getPosition().y));
+                                points.add(new Vector2d(landmarks.get(24).getPosition().x, landmarks.get(12).getPosition().y));
+                                PoseLandmark rightShoulder = pose.getPoseLandmark(PoseLandmark.RIGHT_SHOULDER);
+                                PoseLandmark leftHip = pose.getPoseLandmark(PoseLandmark.LEFT_HIP);
+                                centerPose = new Vector2d((rightShoulder.getPosition().x+leftHip.getPosition().x)/2,(rightShoulder.getPosition().y+leftHip.getPosition().y)/2);
+                            }
+                            else{
+                                hasData = false;
+                                landmarks = null;
+                                centerPose = null;
+                            }
+                            processing = false;
+                        })
+                .addOnFailureListener(
+                        e -> {
+                            hasData = false;
+                            landmarks = null;
+                            centerPose = null;
+                            processing=false;
+                        });
     }
 
     @Override
@@ -148,6 +164,18 @@ public class PoseProcessor implements VisionProcessor {
 
     public double pointDist(PointF p1,PointF p2){
         return Math.sqrt(Math.pow(p1.x-p2.x,2)+Math.pow(p1.y-p2.y,2));
+    }
+
+    public boolean isLeftHandUp(){
+        PointF leftWrist=landmarks.get(PoseLandmark.LEFT_WRIST).getPosition();
+        PointF leftShoulder=landmarks.get(PoseLandmark.LEFT_SHOULDER).getPosition();
+        return (leftShoulder.y-leftWrist.y>=0.17*verticalTarget*height);
+    }
+
+    public double getLeftAngle(){
+        PointF leftWrist=landmarks.get(PoseLandmark.LEFT_WRIST).getPosition();
+        PointF leftElbow=landmarks.get(PoseLandmark.LEFT_ELBOW).getPosition();
+        return Math.tan((leftElbow.x-leftWrist.x)/(leftElbow.y-leftWrist.y));
     }
 
 }
